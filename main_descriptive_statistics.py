@@ -1,46 +1,12 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from load_data import load_data
 from descriptive_statistics.descriptive_statistics import descriptive_statistics
 from descriptive_statistics.p_value import calculate_p_value, analyze_all_variables
 pd.set_option('display.float_format', lambda x: '%.2f' % x)
 
-def debug_missing_values(df):
-    """調試關鍵變數的缺失值分布
-    
-    Args:
-        df: DataFrame包含數據
-    """
-    key_cols = ['Height', 'Weight', 'BMI', 'AGE', 'SEX']
-    
-    print("=== 關鍵變數缺失值分析 ===")
-    print(f"總樣本數: {len(df)}")
-    print(f"Sepsis組: {len(df[df['isSepsis'] == 'Y'])} 人")
-    print(f"Non-sepsis組: {len(df[df['isSepsis'] == 'N'])} 人")
-    print()
-    
-    for col in key_cols:
-        if col not in df.columns:
-            continue
-            
-        total_valid = df[col].notna().sum()
-        sepsis_valid = df[(df['isSepsis'] == "Y") & (df[col].notna())].shape[0]
-        non_sepsis_valid = df[(df['isSepsis'] == "N") & (df[col].notna())].shape[0]
-        
-        print(f"{col:10} | 有效數據: {total_valid:4} | Sepsis: {sepsis_valid:3} | Non-sepsis: {non_sepsis_valid:4}")
-    
-    # 檢查Height的具體情況
-    if 'Height' in df.columns:
-        print(f"\nHeight詳細分析:")
-        print(f"Height總缺失: {df['Height'].isna().sum()}")
-        print(f"Sepsis組Height缺失: {df[(df['isSepsis'] == 'Y') & (df['Height'].isna())].shape[0]}")
-        print(f"Non-sepsis組Height缺失: {df[(df['isSepsis'] == 'N') & (df['Height'].isna())].shape[0]}")
-
-
 def comprehensive_analysis(df):
-    """進行完整的描述性統計分析，包含分組統計和顯著性檢驗
+    """進行完整的描述性統計分析，直接使用descriptive_statistics模組的功能
     
     Args:
         df: DataFrame包含數據
@@ -57,76 +23,78 @@ def comprehensive_analysis(df):
         'sepsis_unique_values': sorted(df['isSepsis'].unique())
     }
     
-    # 2. 總體描述性統計
+    # 2. 總體描述性統計 - 直接使用descriptive_statistics模組
     results['overall_stats'] = descriptive_statistics(df)
     
-    # 3. 分組描述性統計
-    results['group_stats'] = group_descriptive_statistics(df)
+    # 3. 分組描述性統計 - 直接使用descriptive_statistics模組
+    sepsis_df = df[df['isSepsis'] == "Y"]
+    non_sepsis_df = df[df['isSepsis'] == "N"]
     
-    # 4. 統計顯著性分析
+    results['sepsis_stats'] = descriptive_statistics(sepsis_df) if len(sepsis_df) > 0 else None
+    results['non_sepsis_stats'] = descriptive_statistics(non_sepsis_df) if len(non_sepsis_df) > 0 else None
+    
+    # 4. 統計顯著性分析 - 直接使用p_value模組
     results['significance_analysis'] = analyze_all_variables(df)
+    
+    # 5. 整合分組統計結果
+    results['group_summary'] = create_group_summary(results)
     
     return results
 
 
-def group_descriptive_statistics(df):
-    """依據isSepsis分組計算描述性統計
+def create_group_summary(results):
+    """整合總體、分組統計和p值結果
     
     Args:
-        df: DataFrame包含數據
+        results: comprehensive_analysis的中間結果
         
     Returns:
-        summary_df: 包含分組統計和p-value的DataFrame
+        DataFrame: 整合的分組比較表
     """
-    # 使用現有的描述性統計功能
-    total_stats = descriptive_statistics(df)
-    
-    # 分別計算各組的統計
-    sepsis_df = df[df['isSepsis'] == "Y"]
-    non_sepsis_df = df[df['isSepsis'] == "N"]
-    
-    sepsis_stats = descriptive_statistics(sepsis_df) if len(sepsis_df) > 0 else None
-    non_sepsis_stats = descriptive_statistics(non_sepsis_df) if len(non_sepsis_df) > 0 else None
-    
-    # 獲取結構化變數列表
-    structured_cols = [col for col in df.columns if col not in ['diagnosis', 'chief', 'isSepsis']]
+    overall_stats = results['overall_stats']
+    sepsis_stats = results['sepsis_stats']
+    non_sepsis_stats = results['non_sepsis_stats']
+    significance_analysis = results['significance_analysis']
     
     summary_results = []
     
-    for col in structured_cols:
-        if col not in total_stats.index:
-            continue
-            
-        # 獲取總體統計
-        total_mean = total_stats.loc[col, 'mean']
-        total_std = total_stats.loc[col, 'std']
-        total_count = total_stats.loc[col, 'count']
+    for variable in overall_stats.index:
+        # 總體統計
+        total_mean = overall_stats.loc[variable, 'mean']
+        total_std = overall_stats.loc[variable, 'std']
+        total_count = overall_stats.loc[variable, 'count']
         
-        # 獲取敗血症組統計
-        if sepsis_stats is not None and col in sepsis_stats.index:
-            sepsis_mean = sepsis_stats.loc[col, 'mean']
-            sepsis_std = sepsis_stats.loc[col, 'std']
-            sepsis_count = sepsis_stats.loc[col, 'count']
+        # 敗血症組統計
+        if sepsis_stats is not None and variable in sepsis_stats.index:
+            sepsis_mean = sepsis_stats.loc[variable, 'mean']
+            sepsis_std = sepsis_stats.loc[variable, 'std']
+            sepsis_count = sepsis_stats.loc[variable, 'count']
             sepsis_mean_sd = f"{sepsis_mean:.2f} ({sepsis_std:.2f})" if not pd.isna(sepsis_mean) else "無數據"
         else:
             sepsis_count = 0
             sepsis_mean_sd = "無數據"
         
-        # 獲取非敗血症組統計
-        if non_sepsis_stats is not None and col in non_sepsis_stats.index:
-            non_sepsis_mean = non_sepsis_stats.loc[col, 'mean']
-            non_sepsis_std = non_sepsis_stats.loc[col, 'std']
-            non_sepsis_count = non_sepsis_stats.loc[col, 'count']
+        # 非敗血症組統計
+        if non_sepsis_stats is not None and variable in non_sepsis_stats.index:
+            non_sepsis_mean = non_sepsis_stats.loc[variable, 'mean']
+            non_sepsis_std = non_sepsis_stats.loc[variable, 'std']
+            non_sepsis_count = non_sepsis_stats.loc[variable, 'count']
             non_sepsis_mean_sd = f"{non_sepsis_mean:.2f} ({non_sepsis_std:.2f})" if not pd.isna(non_sepsis_mean) else "無數據"
         else:
             non_sepsis_count = 0
             non_sepsis_mean_sd = "無數據"
         
-        # 計算p-value
-        p_value, test_type = calculate_p_value(df, col)
+        # 獲取p值和檢驗類型
+        sig_row = significance_analysis[significance_analysis['variable'] == variable]
+        if len(sig_row) > 0:
+            p_value = sig_row.iloc[0]['p_value']
+            test_type = sig_row.iloc[0]['test_type']
+        else:
+            p_value = np.nan
+            test_type = "未檢驗"
         
         summary_results.append({
-            'variable': col,
+            'variable': variable,
             'total_mean_sd': f"{total_mean:.2f} ({total_std:.2f})" if not pd.isna(total_mean) else "無數據",
             'sepsis_mean_sd': sepsis_mean_sd,
             'non_sepsis_mean_sd': non_sepsis_mean_sd,
@@ -137,8 +105,7 @@ def group_descriptive_statistics(df):
             'non_sepsis_n': int(non_sepsis_count) if not pd.isna(non_sepsis_count) else 0
         })
     
-    summary_df = pd.DataFrame(summary_results)
-    return summary_df
+    return pd.DataFrame(summary_results)
 
 
 def display_results(results):
@@ -166,10 +133,62 @@ def display_results(results):
         print(significant_vars[['variable', 'p_value', 'significance_level', 'test_type']].to_string(index=False))
     
     # 分組描述性統計
-    group_stats = results['group_stats']
+    group_summary = results['group_summary']
     print(f"\n=== 分組描述性統計 ===")
     display_columns = ['variable', 'total_mean_sd', 'sepsis_mean_sd', 'non_sepsis_mean_sd', 'p_value', 'sepsis_n', 'non_sepsis_n']
-    print(group_stats[display_columns].to_string(index=False))
+    print(group_summary[display_columns].to_string(index=False))
+
+
+def save_results_to_excel(results, filename='result/descriptive_statistics_results.xlsx'):
+    """將描述性統計結果保存到Excel文件
+    
+    Args:
+        results: comprehensive_analysis函數返回的結果字典
+        filename: 輸出Excel文件名
+    """
+    import os
+    
+    # 確保result目錄存在
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    
+    with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+        # 1. 基本信息工作表
+        basic_info_df = pd.DataFrame([
+            ['總樣本數', results['basic_info']['total_samples']],
+            ['敗血症組人數', results['basic_info']['sepsis_distribution']['Y']],
+            ['非敗血症組人數', results['basic_info']['sepsis_distribution']['N']],
+            ['敗血症比例(%)', round(results['basic_info']['sepsis_distribution']['Y'] / results['basic_info']['total_samples'] * 100, 2)]
+        ], columns=['項目', '數值'])
+        basic_info_df.to_excel(writer, sheet_name='基本信息', index=False)
+        
+        # 2. 分組描述性統計工作表
+        group_summary = results['group_summary'].copy()
+        # 格式化p_value欄位為4位小數
+        if 'p_value' in group_summary.columns:
+            group_summary['p_value'] = group_summary['p_value'].apply(lambda x: round(float(x), 4) if pd.notna(x) else x)
+        group_summary.to_excel(writer, sheet_name='分組描述性統計', index=False)
+        
+        # 3. 統計顯著性分析工作表
+        significance_results = results['significance_analysis'].copy()
+        # 格式化p_value欄位為4位小數
+        if 'p_value' in significance_results.columns:
+            significance_results['p_value'] = significance_results['p_value'].apply(lambda x: round(float(x), 4) if pd.notna(x) else x)
+        significance_results.to_excel(writer, sheet_name='統計顯著性分析', index=False)
+        
+        # 4. 顯著變數清單工作表
+        significant_vars = significance_results[significance_results['significant']]
+        if len(significant_vars) > 0:
+            significant_summary = significant_vars[['variable', 'p_value', 'significance_level', 'test_type']].copy()
+            significant_summary = significant_summary.sort_values('p_value')
+            # 格式化p_value欄位為4位小數
+            if 'p_value' in significant_summary.columns:
+                significant_summary['p_value'] = significant_summary['p_value'].apply(lambda x: round(float(x), 4) if pd.notna(x) else x)
+            significant_summary.to_excel(writer, sheet_name='顯著變數清單', index=False)
+    
+    print(f"\n=== Excel結果已保存 ===")
+    print(f"文件位置: {filename}")
+    print(f"包含工作表: 基本信息、分組描述性統計、統計顯著性分析、顯著變數清單")
+    print(f"數值格式: p值已格式化為4位小數的一般數字形式")
 
 
 
@@ -177,17 +196,13 @@ if __name__ == "__main__":
     # 載入資料
     df = load_data("data\\1141112.xlsx")
     
-    # 先進行缺失值調試分析
-    debug_missing_values(df)
-    
-    print("\n" + "="*60 + "\n")
-    
-    # 進行完整分析
+    # 進行完整分析 - 直接使用descriptive_statistics模組功能
     results = comprehensive_analysis(df)
     
     # 顯示結果
     display_results(results)
     
-    # 可選：儲存結果到檔案
-    # results['group_stats'].to_csv('group_statistics.csv', index=False, encoding='utf-8-sig')
-    # results['significance_analysis'].to_csv('significance_analysis.csv', index=False, encoding='utf-8-sig')
+    # 保存結果到Excel文件
+    save_results_to_excel(results)
+    
+    print("\n描述性統計分析完成！")

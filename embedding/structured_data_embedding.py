@@ -1,7 +1,12 @@
 import pandas as pd
 import numpy as np
 import os
+import sys
 from sklearn.preprocessing import StandardScaler
+
+# 添加父目錄到路徑以便導入模組
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from load_data import load_data
 from split_data import split_data
 

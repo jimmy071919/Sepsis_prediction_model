@@ -1,6 +1,10 @@
 import numpy as np
 import os
 from sklearn.preprocessing import LabelEncoder
+import sys
+import os 
+# 添加父目錄到路徑以便導入模組
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from load_data import load_data
 from split_data import split_data
 

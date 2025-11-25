@@ -7,6 +7,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.impute import SimpleImputer
+import joblib
+import os
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -15,21 +17,20 @@ from load_data import load_data
 class CrossValidationTrainer:
     """使用10-fold交叉驗證的模型訓練器"""
     
-    def __init__(self, df, random_state=42, n_folds=10):
+    def __init__(self, random_state=42, n_folds=10):
         """
         初始化交叉驗證訓練器
         
         Args:
-            df: DataFrame，包含所有數據
             random_state: 隨機種子
             n_folds: 交叉驗證折數
         """
-        self.df = df
         self.random_state = random_state
         self.n_folds = n_folds
         self.models = self._initialize_models()
         self.cv_results = {}
         self.test_results = {}
+        self.trained_models = {}  # 儲存訓練好的模型
         # 初始化數據填充器 (用於處理NaN值)
         self.imputer = SimpleImputer(strategy='median')
         # 初始化交叉驗證策略
@@ -167,6 +168,11 @@ class CrossValidationTrainer:
                 print(f"正在訓練 {model_name} 並在測試集上評估...")
                 model.fit(X_train, y_train)
                 
+                # 保存訓練好的模型
+                if feature_type not in self.trained_models:
+                    self.trained_models[feature_type] = {}
+                self.trained_models[feature_type][model_name] = model
+                
                 # 在測試集上預測
                 y_test_pred = model.predict(X_test)
                 y_test_prob = model.predict_proba(X_test)[:, 1] if hasattr(model, 'predict_proba') else model.decision_function(X_test)
@@ -257,10 +263,62 @@ class CrossValidationTrainer:
             test_df = pd.DataFrame(test_df_data)
             print(test_df.to_string(index=False))
     
-    def save_results_to_csv(self):
-        """將結果保存為CSV文件"""
-        # 保存交叉驗證結果
+    def save_results_to_xlsx(self):
+        """將結果保存為Excel文件，每個特徵類型對應不同的工作表"""
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils.dataframe import dataframe_to_rows
+        from datetime import datetime
+        
+        # 創建Excel文件名
+        excel_filename = 'result/cross_validation_results.xlsx'
+        
+        print(f"\n📊 正在保存結果到 Excel 檔案: {excel_filename}")
+        
+        # 創建工作簿
+        wb = openpyxl.Workbook()
+        # 移除默認工作表
+        wb.remove(wb.active)
+        
+        # 定義樣式
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        border = Border(
+            left=Side(border_style="thin"),
+            right=Side(border_style="thin"),
+            top=Side(border_style="thin"),
+            bottom=Side(border_style="thin")
+        )
+        center_alignment = Alignment(horizontal="center", vertical="center")
+        
+        # 創建摘要工作表
+        summary_ws = wb.create_sheet("📊 摘要總覽")
+        
+        # 寫入摘要標題
+        summary_ws['A1'] = f"敗血症預測模型 {self.n_folds}-fold 交叉驗證結果摘要"
+        summary_ws['A1'].font = Font(size=16, bold=True)
+        summary_ws['A2'] = f"生成時間: {datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}"
+        summary_ws['A2'].font = Font(size=12, italic=True)
+        
+        # 合併標題單元格
+        summary_ws.merge_cells('A1:H1')
+        summary_ws.merge_cells('A2:H2')
+        
+        summary_row = 4
+        
+        # 為每個特徵類型創建工作表並保存結果
         for feature_type in self.cv_results:
+            print(f"   正在處理 {feature_type} 特徵...")
+            
+            # 創建交叉驗證結果工作表
+            cv_ws_name = f"CV_{feature_type.replace('-', '_').replace(',', '_')}"
+            cv_ws = wb.create_sheet(cv_ws_name)
+            
+            # 創建測試結果工作表
+            test_ws_name = f"Test_{feature_type.replace('-', '_').replace(',', '_')}"
+            test_ws = wb.create_sheet(test_ws_name)
+            
+            # 準備交叉驗證數據
             cv_data = []
             test_data = []
             
@@ -269,31 +327,199 @@ class CrossValidationTrainer:
                 cv_results = self.cv_results[feature_type][model_name]
                 cv_data.append({
                     'Model': model_name,
-                    'AUC_mean': cv_results['AUC_mean'],
-                    'AUC_std': cv_results['AUC_std'],
-                    'precision_mean': cv_results['precision_mean'],
-                    'precision_std': cv_results['precision_std'],
-                    'recall_mean': cv_results['recall_mean'],
-                    'recall_std': cv_results['recall_std'],
-                    'f1_mean': cv_results['f1_mean'],
-                    'f1_std': cv_results['f1_std']
+                    'AUC_mean': round(cv_results['AUC_mean'], 4),
+                    'AUC_std': round(cv_results['AUC_std'], 4),
+                    'Precision_mean': round(cv_results['precision_mean'], 4),
+                    'Precision_std': round(cv_results['precision_std'], 4),
+                    'Recall_mean': round(cv_results['recall_mean'], 4),
+                    'Recall_std': round(cv_results['recall_std'], 4),
+                    'F1_mean': round(cv_results['f1_mean'], 4),
+                    'F1_std': round(cv_results['f1_std'], 4)
                 })
                 
                 # 測試集結果
                 test_results = self.test_results[feature_type][model_name]
                 test_data.append({
                     'Model': model_name,
-                    'AUC': test_results['AUC'],
-                    'precision': test_results['precision'],
-                    'recall': test_results['recall'],
-                    'f1': test_results['f1']
+                    'AUC': round(test_results['AUC'], 4),
+                    'Precision': round(test_results['precision'], 4),
+                    'Recall': round(test_results['recall'], 4),
+                    'F1': round(test_results['f1'], 4)
                 })
             
-            # 保存到CSV
+            # 創建DataFrame
             cv_df = pd.DataFrame(cv_data)
             test_df = pd.DataFrame(test_data)
             
-            cv_df.to_csv(f'result/cv_results_{feature_type.replace("-", "_").replace(",", "_")}.csv', index=False)
-            test_df.to_csv(f'result/test_results_{feature_type.replace("-", "_").replace(",", "_")}.csv', index=False)
+            # 寫入交叉驗證工作表
+            cv_ws['A1'] = f"{feature_type} 特徵 - {self.n_folds}-fold 交叉驗證結果"
+            cv_ws['A1'].font = Font(size=14, bold=True)
+            cv_ws.merge_cells('A1:I1')
+            
+            # 寫入CV數據
+            for r in dataframe_to_rows(cv_df, index=False, header=True):
+                cv_ws.append(r)
+            
+            # 寫入測試結果工作表
+            test_ws['A1'] = f"{feature_type} 特徵 - 測試集評估結果"
+            test_ws['A1'].font = Font(size=14, bold=True)
+            test_ws.merge_cells('A1:E1')
+            
+            # 寫入測試數據
+            for r in dataframe_to_rows(test_df, index=False, header=True):
+                test_ws.append(r)
+            
+            # 格式化交叉驗證工作表
+            self._format_worksheet(cv_ws, cv_df.shape[0] + 2, cv_df.shape[1], 
+                                 header_font, header_fill, border, center_alignment)
+            
+            # 格式化測試結果工作表
+            self._format_worksheet(test_ws, test_df.shape[0] + 2, test_df.shape[1], 
+                                 header_font, header_fill, border, center_alignment)
+            
+            # 在摘要工作表中添加最佳結果
+            summary_ws[f'A{summary_row}'] = f"{feature_type} 特徵最佳結果:"
+            summary_ws[f'A{summary_row}'].font = Font(bold=True)
+            summary_row += 1
+            
+            # 找出最佳AUC結果
+            best_cv_auc = max(cv_data, key=lambda x: x['AUC_mean'])
+            best_test_auc = max(test_data, key=lambda x: x['AUC'])
+            
+            summary_ws[f'B{summary_row}'] = f"交叉驗證最佳AUC: {best_cv_auc['Model']} ({best_cv_auc['AUC_mean']:.4f} ± {best_cv_auc['AUC_std']:.4f})"
+            summary_row += 1
+            summary_ws[f'B{summary_row}'] = f"測試集最佳AUC: {best_test_auc['Model']} ({best_test_auc['AUC']:.4f})"
+            summary_row += 2
         
-        print(f"\\n結果已保存到 result/cv_results_*.csv 和 result/test_results_*.csv 檔案")
+        # 調整摘要工作表列寬
+        from openpyxl.utils import get_column_letter
+        for col_idx in range(1, 9):  # 假設最多8列
+            max_length = 0
+            column_letter = get_column_letter(col_idx)
+            
+            # 檢查這一列的所有單元格來計算最大長度
+            for row in range(1, summary_row + 1):
+                try:
+                    cell = summary_ws.cell(row=row, column=col_idx)
+                    if cell.value and hasattr(cell, 'value'):
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            
+            # 設定列寬
+            if max_length > 0:
+                summary_ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+        
+        # 保存Excel文件
+        wb.save(excel_filename)
+        
+        print(f"✅ 結果已成功保存到 {excel_filename}")
+        print(f"📋 包含 {len(self.cv_results)} 個特徵組合的詳細結果")
+        print(f"📊 每個特徵組合都有獨立的交叉驗證和測試結果工作表")
+    
+    def _format_worksheet(self, ws, num_rows, num_cols, header_font, header_fill, border, center_alignment):
+        """格式化工作表"""
+        # 格式化標題行
+        for col in range(1, num_cols + 1):
+            cell = ws.cell(row=2, column=col)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center_alignment
+            cell.border = border
+        
+        # 格式化數據行
+        for row in range(3, num_rows + 1):
+            for col in range(1, num_cols + 1):
+                cell = ws.cell(row=row, column=col)
+                cell.border = border
+                cell.alignment = center_alignment
+        
+        # 調整列寬 - 修復合併單元格問題
+        from openpyxl.utils import get_column_letter
+        for col_idx in range(1, num_cols + 1):
+            max_length = 0
+            column_letter = get_column_letter(col_idx)
+            
+            # 檢查這一列的所有單元格來計算最大長度
+            for row in range(1, num_rows + 1):
+                cell = ws.cell(row=row, column=col_idx)
+                if cell.value and not isinstance(cell, type(ws.merged_cells)):
+                    max_length = max(max_length, len(str(cell.value)))
+            
+            # 設定列寬
+            ws.column_dimensions[column_letter].width = min(max_length + 2, 20)
+    
+    def save_trained_models(self):
+        """保存所有訓練好的模型到檔案"""
+        if not os.path.exists('models'):
+            os.makedirs('models')
+        
+        print(f"\n🤖 正在保存訓練好的模型...")
+        
+        saved_count = 0
+        for feature_type in self.trained_models:
+            for model_name, model in self.trained_models[feature_type].items():
+                # 創建模型檔名
+                model_filename = f'models/{feature_type.replace("-", "_").replace(",", "_")}_{model_name}.pkl'
+                
+                # 保存模型
+                joblib.dump(model, model_filename)
+                saved_count += 1
+                print(f"   ✅ {feature_type}-{model_name} 模型已保存: {model_filename}")
+        
+        print(f"\n📁 總共保存了 {saved_count} 個訓練好的模型到 models/ 目錄")
+        print(f"💡 使用 joblib.load('模型路徑') 來載入模型進行預測")
+        
+        # 創建模型使用說明檔案
+        self._create_model_usage_guide()
+    
+    def _create_model_usage_guide(self):
+        """創建模型使用說明檔案"""
+        guide_content = '''# 訓練模型使用說明
+
+## 模型檔案說明
+
+本目錄包含了敗血症預測模型的所有訓練好的模型檔案。
+
+### 檔案命名規則
+- 格式: `{特徵類型}_{模型名稱}.pkl`
+- 特徵類型:
+  - `a_x`: 僅結構化數據特徵
+  - `y`: 僅主訴文本嵌入
+  - `z`: 僅診斷文本嵌入
+  - `a_y`: 結構化數據 + 主訴文本
+  - `a_x_z`: 結構化數據 + 診斷文本
+  - `a_z`: 結構化數據 + 主訴文本 + 診斷文本
+- 模型名稱: DT(決策樹), SVM(支持向量機), RF(隨機森林), CNN(神經網路)
+
+### 載入和使用模型
+
+```python
+import joblib
+import numpy as np
+
+# 載入模型
+model = joblib.load('models/a_z_RF.pkl')  # 例如載入最佳組合的隨機森林模型
+
+# 準備預測數據 (需要和訓練時相同的特徵順序和格式)
+X_new = np.array([...])  # 新的病患數據
+
+# 進行預測
+y_pred = model.predict(X_new)  # 預測類別 (0: 無敗血症, 1: 有敗血症)
+y_prob = model.predict_proba(X_new)[:, 1]  # 預測概率
+
+print(f"預測結果: {y_pred[0]}")
+print(f"敗血症概率: {y_prob[0]:.3f}")
+```
+
+### 注意事項
+1. 使用模型前需確保輸入數據的預處理與訓練時一致
+2. 結構化數據需要經過相同的標準化處理
+3. 文本數據需要經過相同的BERT嵌入處理
+4. 建議使用交叉驗證結果中表現最佳的模型組合
+'''
+        
+        with open('models/README.md', 'w', encoding='utf-8') as f:
+            f.write(guide_content)
+        
+        print(f"📝 模型使用說明已保存: models/README.md")

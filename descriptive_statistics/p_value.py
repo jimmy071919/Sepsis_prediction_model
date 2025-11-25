@@ -1,6 +1,11 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import ttest_ind, chi2_contingency, fisher_exact
+import sys
+import os
+
+# 添加父目錄到 Python 路徑
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from load_data import load_data
 pd.set_option('display.float_format', lambda x: '%.2f' % x)
 

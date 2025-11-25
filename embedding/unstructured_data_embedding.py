@@ -2,6 +2,10 @@ import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 import torch
 import numpy as np
+import sys
+import os
+# 添加父目錄到路徑以便導入模組
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 from load_data import load_data
@@ -44,6 +48,8 @@ def get_and_save_bert_embedding(text_series, save_path=None):
     
     # 如果有提供儲存路徑，則儲存結果
     if save_path:
+        # 確保儲存目錄存在
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
         np.save(save_path, embeddings_array)
         print(f"Embedding 結果已儲存至: {save_path}")
     
@@ -58,21 +64,21 @@ if __name__ == "__main__":
     # 處理 x_train和x_test的diagnosis 欄位並儲存結果
     x_train_diagnosis_embed = get_and_save_bert_embedding(
         x_train['diagnosis'], 
-        save_path="embeddings/x_train_diagnosis_embed.npy"
+        save_path="unstructured_data_embedding/x_train_diagnosis_embed.npy"
     )
     x_test_diagnosis_embed = get_and_save_bert_embedding(
         x_test['diagnosis'], 
-        save_path="embeddings/x_test_diagnosis_embed.npy"
+        save_path="unstructured_data_embedding/x_test_diagnosis_embed.npy"
     )
     
     # 處理 x_train和x_test的chief 欄位並儲存結果
     x_train_chief_embed = get_and_save_bert_embedding(
         x_train['chief'], 
-        save_path="embeddings/x_train_chief_embed.npy"
+        save_path="unstructured_data_embedding/x_train_chief_embed.npy"
     )
     x_test_chief_embed = get_and_save_bert_embedding(
         x_test['chief'], 
-        save_path="embeddings/x_test_chief_embed.npy"
+        save_path="unstructured_data_embedding/x_test_chief_embed.npy"
     )
     
     print("所有 embedding 處理完成！")
