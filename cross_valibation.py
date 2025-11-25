@@ -297,22 +297,3 @@ class CrossValidationTrainer:
             test_df.to_csv(f'result/test_results_{feature_type.replace("-", "_").replace(",", "_")}.csv', index=False)
         
         print(f"\\n結果已保存到 result/cv_results_*.csv 和 result/test_results_*.csv 檔案")
-
-
-def main():
-    """主函數"""
-    # 載入數據
-    df = load_data('data/1141112.xlsx')
-    
-    # 創建交叉驗證訓練器
-    cv_trainer = CrossValidationTrainer(df, random_state=42, n_folds=10)
-    
-    # 執行交叉驗證研究
-    cv_trainer.run_cross_validation_study()
-    
-    # 保存結果
-    cv_trainer.save_results_to_csv()
-
-
-if __name__ == "__main__":
-    main()
