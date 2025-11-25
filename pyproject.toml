@@ -1,0 +1,12 @@
+[project]
+name = "sepsis-prediction-model"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "certifi==2025.10.5",
+    "charset-normalizer==3.4.4",
+    "idna==3.11",
+    "urllib3==2.5.0",
+]
