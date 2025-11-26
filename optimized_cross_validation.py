@@ -144,6 +144,9 @@ class OptimizedCrossValidationTrainer:
         elif feature_type == 'z':
             X_train = X_train_diagnosis
             X_test = X_test_diagnosis
+        elif feature_type == 'y-z':
+            X_train = np.concatenate([X_train_chief, X_train_diagnosis], axis=1)
+            X_test = np.concatenate([X_test_chief, X_test_diagnosis], axis=1)
         elif feature_type == 'a-y':
             X_train = np.concatenate([X_train_structured, X_train_chief], axis=1)
             X_test = np.concatenate([X_test_structured, X_test_chief], axis=1)
@@ -180,7 +183,7 @@ class OptimizedCrossValidationTrainer:
                 X_fold_val = fold_imputer.transform(X_fold_val)
             
             # 對純文本特徵使用SMOTE
-            if self.use_smote and feature_type in ['y', 'z']:
+            if self.use_smote and feature_type in ['y', 'z', 'y-z']:
                 try:
                     X_fold_train, y_fold_train = self.smote.fit_resample(X_fold_train, y_fold_train)
                     print(f"      Fold {fold_idx + 1} SMOTE後數量: {len(y_fold_train)}")
@@ -259,7 +262,7 @@ class OptimizedCrossValidationTrainer:
                     X_test_final = final_imputer.transform(X_test_final)
                 
                 # 對純文本特徵使用SMOTE
-                if self.use_smote and feature_type in ['y', 'z']:
+                if self.use_smote and feature_type in ['y', 'z', 'y-z']:
                     try:
                         X_train_final, y_train_final = self.smote.fit_resample(X_train_final, y_train_final)
                         print(f"  最終訓練集SMOTE後數量: {len(y_train_final)}")
@@ -314,7 +317,7 @@ class OptimizedCrossValidationTrainer:
     
     def run_optimized_cross_validation_study(self):
         """執行完整的優化交叉驗證研究"""
-        feature_types = ['a-x', 'y', 'z', 'a-y', 'a-x,z', 'a-z']
+        feature_types = ['a-x', 'y', 'z', 'y-z', 'a-y', 'a-x,z', 'a-z']
         
         print(f"=== 開始優化的 {self.n_folds}-fold 交叉驗證研究 ===")
         if self.use_smote:

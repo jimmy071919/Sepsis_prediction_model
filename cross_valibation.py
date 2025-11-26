@@ -132,6 +132,9 @@ class CrossValidationTrainer:
         elif feature_type == 'z':
             X_train = X_train_diagnosis
             X_test = X_test_diagnosis
+        elif feature_type == 'y-z':
+            X_train = np.concatenate([X_train_chief, X_train_diagnosis], axis=1)
+            X_test = np.concatenate([X_test_chief, X_test_diagnosis], axis=1)
         elif feature_type == 'a-y':
             X_train = np.concatenate([X_train_structured, X_train_chief], axis=1)
             X_test = np.concatenate([X_test_structured, X_test_chief], axis=1)
@@ -268,7 +271,7 @@ class CrossValidationTrainer:
     
     def run_cross_validation_study(self):
         """執行完整的交叉驗證研究"""
-        feature_types = ['a-x', 'y', 'z', 'a-y', 'a-x,z', 'a-z']
+        feature_types = ['a-x', 'y', 'z', 'y-z', 'a-y', 'a-x,z', 'a-z']
         
         print(f"=== 開始 {self.n_folds}-fold 交叉驗證研究 ===")
         
