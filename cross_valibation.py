@@ -57,6 +57,45 @@ class CrossValidationTrainer:
         }
         return scoring
     
+    def _custom_cross_validate(self, model, X, y, feature_type):
+        """自定義交叉驗證，在每個fold內部正確處理NaN值"""
+        from sklearn.base import clone
+        
+        cv_scores = {'auc': [], 'precision': [], 'recall': [], 'f1': []}
+        
+        for fold_idx, (train_idx, val_idx) in enumerate(self.cv_strategy.split(X, y)):
+            print(f"    處理 Fold {fold_idx + 1}/{self.n_folds}...")
+            
+            # 分割當前fold的數據
+            X_fold_train, X_fold_val = X[train_idx], X[val_idx]
+            y_fold_train, y_fold_val = y[train_idx], y[val_idx]
+            
+            # 在當前fold的訓練集上處理NaN值
+            if np.isnan(X_fold_train).any() or np.isnan(X_fold_val).any():
+                fold_imputer = SimpleImputer(strategy='median')
+                X_fold_train = fold_imputer.fit_transform(X_fold_train)
+                X_fold_val = fold_imputer.transform(X_fold_val)
+            
+            # 訓練模型
+            fold_model = clone(model)
+            fold_model.fit(X_fold_train, y_fold_train)
+            
+            # 預測
+            y_pred = fold_model.predict(X_fold_val)
+            y_prob = fold_model.predict_proba(X_fold_val)[:, 1] if hasattr(fold_model, 'predict_proba') else fold_model.decision_function(X_fold_val)
+            
+            # 計算指標
+            cv_scores['auc'].append(roc_auc_score(y_fold_val, y_prob))
+            cv_scores['precision'].append(precision_score(y_fold_val, y_pred, average='binary', zero_division=0))
+            cv_scores['recall'].append(recall_score(y_fold_val, y_pred, average='binary', zero_division=0))
+            cv_scores['f1'].append(f1_score(y_fold_val, y_pred, average='binary', zero_division=0))
+        
+        # 轉換為numpy數組
+        for metric in cv_scores:
+            cv_scores[metric] = np.array(cv_scores[metric])
+        
+        return cv_scores
+    
     def load_and_prepare_data(self, feature_type):
         """載入和準備指定特徵類型的數據"""
         try:
@@ -100,17 +139,7 @@ class CrossValidationTrainer:
         else:
             raise ValueError(f"不支援的特徵類型: {feature_type}")
         
-        # 處理NaN值 (只對包含結構化數據的特徵組合進行填補)
-        if feature_type in ['a-x', 'a-y', 'a-x,z', 'a-z']:
-            # 檢查是否有NaN值
-            if np.isnan(X_train).any() or np.isnan(X_test).any():
-                print(f"檢測到NaN值，正在使用中位數填補...")
-                # 在訓練集上擬合填補器
-                self.imputer.fit(X_train)
-                # 對訓練集和測試集進行填補
-                X_train = self.imputer.transform(X_train)
-                X_test = self.imputer.transform(X_test)
-                print(f"NaN值填補完成")
+        # 注意：NaN值處理已移至交叉驗證內部，避免資料洩漏
         
         return X_train, X_test, y_train, y_test
     
@@ -126,9 +155,6 @@ class CrossValidationTrainer:
         print(f"訓練集標籤: {y_train.shape}")
         print(f"測試集標籤: {y_test.shape}")
         
-        # 獲取評估指標
-        scoring = self._get_scoring_metrics()
-        
         cv_results = {}
         test_results = {}
         
@@ -137,25 +163,40 @@ class CrossValidationTrainer:
             print(f"\\n正在進行 {model_name} 模型的10-fold交叉驗證...")
             
             try:
-                # 執行交叉驗證
-                cv_scores = cross_validate(
-                    model, X_train, y_train,
-                    cv=self.cv_strategy,
-                    scoring=scoring,
-                    n_jobs=-1,  # 使用所有可用核心
-                    return_train_score=False
-                )
+                # 檢查是否需要處理NaN值
+                has_nan = feature_type in ['a-x', 'a-y', 'a-x,z', 'a-z'] and np.isnan(X_train).any()
+                
+                if has_nan:
+                    # 使用自定義的交叉驗證來正確處理NaN值
+                    cv_scores = self._custom_cross_validate(model, X_train, y_train, feature_type)
+                else:
+                    # 使用標準的交叉驗證
+                    scoring = self._get_scoring_metrics()
+                    cv_scores_dict = cross_validate(
+                        model, X_train, y_train,
+                        cv=self.cv_strategy,
+                        scoring=scoring,
+                        n_jobs=-1,
+                        return_train_score=False
+                    )
+                    # 轉換格式以匹配自定義函數的輸出
+                    cv_scores = {
+                        'auc': cv_scores_dict['test_auc'],
+                        'precision': cv_scores_dict['test_precision'],
+                        'recall': cv_scores_dict['test_recall'],
+                        'f1': cv_scores_dict['test_f1']
+                    }
                 
                 # 計算交叉驗證平均分數和標準差
                 cv_result = {
-                    'AUC_mean': np.mean(cv_scores['test_auc']),
-                    'AUC_std': np.std(cv_scores['test_auc']),
-                    'precision_mean': np.mean(cv_scores['test_precision']),
-                    'precision_std': np.std(cv_scores['test_precision']),
-                    'recall_mean': np.mean(cv_scores['test_recall']),
-                    'recall_std': np.std(cv_scores['test_recall']),
-                    'f1_mean': np.mean(cv_scores['test_f1']),
-                    'f1_std': np.std(cv_scores['test_f1'])
+                    'AUC_mean': np.mean(cv_scores['auc']),
+                    'AUC_std': np.std(cv_scores['auc']),
+                    'precision_mean': np.mean(cv_scores['precision']),
+                    'precision_std': np.std(cv_scores['precision']),
+                    'recall_mean': np.mean(cv_scores['recall']),
+                    'recall_std': np.std(cv_scores['recall']),
+                    'f1_mean': np.mean(cv_scores['f1']),
+                    'f1_std': np.std(cv_scores['f1'])
                 }
                 
                 cv_results[model_name] = cv_result
@@ -166,7 +207,17 @@ class CrossValidationTrainer:
                 
                 # 在整個訓練集上訓練模型，然後在測試集上評估
                 print(f"正在訓練 {model_name} 並在測試集上評估...")
-                model.fit(X_train, y_train)
+                
+                # 為最終模型訓練處理NaN值
+                if has_nan:
+                    fold_imputer = SimpleImputer(strategy='median')
+                    X_train_final = fold_imputer.fit_transform(X_train)
+                    X_test_final = fold_imputer.transform(X_test)
+                else:
+                    X_train_final = X_train
+                    X_test_final = X_test
+                
+                model.fit(X_train_final, y_train)
                 
                 # 保存訓練好的模型
                 if feature_type not in self.trained_models:
@@ -174,8 +225,8 @@ class CrossValidationTrainer:
                 self.trained_models[feature_type][model_name] = model
                 
                 # 在測試集上預測
-                y_test_pred = model.predict(X_test)
-                y_test_prob = model.predict_proba(X_test)[:, 1] if hasattr(model, 'predict_proba') else model.decision_function(X_test)
+                y_test_pred = model.predict(X_test_final)
+                y_test_prob = model.predict_proba(X_test_final)[:, 1] if hasattr(model, 'predict_proba') else model.decision_function(X_test_final)
                 
                 # 計算測試集指標
                 test_result = {

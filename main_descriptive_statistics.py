@@ -5,6 +5,27 @@ from descriptive_statistics.descriptive_statistics import descriptive_statistics
 from descriptive_statistics.p_value import calculate_p_value, analyze_all_variables
 pd.set_option('display.float_format', lambda x: '%.2f' % x)
 
+def format_p_value(p_value):
+    """格式化p值顯示
+    
+    Args:
+        p_value: 原始p值
+        
+    Returns:
+        str: 格式化後的p值字串
+    """
+    if pd.isna(p_value) or p_value is None:
+        return "N/A"
+    
+    try:
+        p_val = float(p_value)
+        if p_val < 0.001:
+            return "<0.001"
+        else:
+            return f"{p_val:.3f}"
+    except (ValueError, TypeError):
+        return str(p_value)
+
 def comprehensive_analysis(df):
     """進行完整的描述性統計分析，直接使用descriptive_statistics模組的功能
     
@@ -122,7 +143,10 @@ def display_results(results):
     print(f"isSepsis唯一值: {basic_info['sepsis_unique_values']}")
     
     # 統計顯著性分析
-    significance_results = results['significance_analysis']
+    significance_results = results['significance_analysis'].copy()
+    # 格式化p值用於顯示
+    significance_results['p_value_formatted'] = significance_results['p_value'].apply(format_p_value)
+    
     significant_vars = significance_results[significance_results['significant']]
     
     print(f"\n=== 統計顯著性分析 ===")
@@ -130,13 +154,20 @@ def display_results(results):
     
     if len(significant_vars) > 0:
         print(f"\n顯著變數清單:")
-        print(significant_vars[['variable', 'p_value', 'significance_level', 'test_type']].to_string(index=False))
+        display_significance = significant_vars[['variable', 'p_value_formatted', 'significance_level', 'test_type']]
+        display_significance.columns = ['variable', 'p_value', 'significance_level', 'test_type']
+        print(display_significance.to_string(index=False))
     
     # 分組描述性統計
-    group_summary = results['group_summary']
+    group_summary = results['group_summary'].copy()
+    # 格式化p值用於顯示
+    group_summary['p_value_formatted'] = group_summary['p_value'].apply(format_p_value)
+    
     print(f"\n=== 分組描述性統計 ===")
-    display_columns = ['variable', 'total_mean_sd', 'sepsis_mean_sd', 'non_sepsis_mean_sd', 'p_value', 'sepsis_n', 'non_sepsis_n']
-    print(group_summary[display_columns].to_string(index=False))
+    display_columns = ['variable', 'total_mean_sd', 'sepsis_mean_sd', 'non_sepsis_mean_sd', 'p_value_formatted', 'sepsis_n', 'non_sepsis_n']
+    display_summary = group_summary[display_columns].copy()
+    display_summary.columns = ['variable', 'total_mean_sd', 'sepsis_mean_sd', 'non_sepsis_mean_sd', 'p_value', 'sepsis_n', 'non_sepsis_n']
+    print(display_summary.to_string(index=False))
 
 
 def save_results_to_excel(results, filename='result/descriptive_statistics_results.xlsx'):
@@ -163,32 +194,42 @@ def save_results_to_excel(results, filename='result/descriptive_statistics_resul
         
         # 2. 分組描述性統計工作表
         group_summary = results['group_summary'].copy()
-        # 格式化p_value欄位為4位小數
+        # 格式化p_value欄位顯示為小數點後三位，小於0.001時顯示<0.001
         if 'p_value' in group_summary.columns:
-            group_summary['p_value'] = group_summary['p_value'].apply(lambda x: round(float(x), 4) if pd.notna(x) else x)
+            group_summary['p_value_formatted'] = group_summary['p_value'].apply(format_p_value)
+            # 保留原始數值版本用於計算，顯示版本用於Excel
+            group_summary['p_value_display'] = group_summary['p_value_formatted']
+            # 移除原始p_value欄位，保留格式化版本
+            group_summary = group_summary.drop('p_value', axis=1)
+            group_summary = group_summary.rename(columns={'p_value_display': 'p_value'})
         group_summary.to_excel(writer, sheet_name='分組描述性統計', index=False)
         
         # 3. 統計顯著性分析工作表
         significance_results = results['significance_analysis'].copy()
-        # 格式化p_value欄位為4位小數
+        # 格式化p_value欄位顯示為小數點後三位，小於0.001時顯示<0.001
         if 'p_value' in significance_results.columns:
-            significance_results['p_value'] = significance_results['p_value'].apply(lambda x: round(float(x), 4) if pd.notna(x) else x)
+            significance_results['p_value_formatted'] = significance_results['p_value'].apply(format_p_value)
+            # 保留原始數值版本用於計算，顯示版本用於Excel
+            significance_results['p_value_display'] = significance_results['p_value_formatted']
+            # 移除原始p_value欄位，保留格式化版本
+            significance_results = significance_results.drop('p_value', axis=1)
+            significance_results = significance_results.rename(columns={'p_value_display': 'p_value'})
         significance_results.to_excel(writer, sheet_name='統計顯著性分析', index=False)
         
         # 4. 顯著變數清單工作表
-        significant_vars = significance_results[significance_results['significant']]
+        significant_vars = results['significance_analysis'][results['significance_analysis']['significant']].copy()
         if len(significant_vars) > 0:
             significant_summary = significant_vars[['variable', 'p_value', 'significance_level', 'test_type']].copy()
             significant_summary = significant_summary.sort_values('p_value')
-            # 格式化p_value欄位為4位小數
+            # 格式化p_value欄位顯示為小數點後三位，小於0.001時顯示<0.001
             if 'p_value' in significant_summary.columns:
-                significant_summary['p_value'] = significant_summary['p_value'].apply(lambda x: round(float(x), 4) if pd.notna(x) else x)
+                significant_summary['p_value'] = significant_summary['p_value'].apply(format_p_value)
             significant_summary.to_excel(writer, sheet_name='顯著變數清單', index=False)
     
     print(f"\n=== Excel結果已保存 ===")
     print(f"文件位置: {filename}")
     print(f"包含工作表: 基本信息、分組描述性統計、統計顯著性分析、顯著變數清單")
-    print(f"數值格式: p值已格式化為4位小數的一般數字形式")
+    print(f"數值格式: p值已格式化為三位小數，小於0.001時顯示為<0.001")
 
 
 
