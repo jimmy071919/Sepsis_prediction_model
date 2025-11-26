@@ -178,7 +178,7 @@ accuracy = accuracy_score(y_test, predictions)
 ## 下一步
 - ✅ 建立描述性統計分析
 - ✅ 實作文字欄位embedding
-- 建立機器學習模型（DT、SVM、ANN、RF）
+- 建立機器學習模型（DT、SVM、ANN、RF、LR、NN、SGD）
 - 進行消融研究
 
 ---

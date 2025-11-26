@@ -5,6 +5,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.impute import SimpleImputer
 import joblib
@@ -42,8 +43,12 @@ class CrossValidationTrainer:
             'DT': DecisionTreeClassifier(random_state=self.random_state, max_depth=10),
             'SVM': SVC(random_state=self.random_state, probability=True, kernel='rbf', C=1.0),
             'RF': RandomForestClassifier(random_state=self.random_state, n_estimators=50, max_depth=10),
-            'CNN': MLPClassifier(random_state=self.random_state, hidden_layer_sizes=(50,), 
-                                max_iter=300, early_stopping=True, validation_fraction=0.1)
+            'ANN': MLPClassifier(random_state=self.random_state, hidden_layer_sizes=(50,), 
+                                max_iter=300, early_stopping=True, validation_fraction=0.1),
+            'LR': LogisticRegression(random_state=self.random_state, max_iter=1000, solver='liblinear'),
+            'NN': MLPClassifier(random_state=self.random_state, hidden_layer_sizes=(100, 50, 25), 
+                               max_iter=500, early_stopping=True, validation_fraction=0.1, alpha=0.01),
+            'SGD': SGDClassifier(random_state=self.random_state, max_iter=1000, loss='log_loss', alpha=0.01)
         }
         return models
     
@@ -541,7 +546,7 @@ class CrossValidationTrainer:
   - `a_y`: 結構化數據 + 主訴文本
   - `a_x_z`: 結構化數據 + 診斷文本
   - `a_z`: 結構化數據 + 主訴文本 + 診斷文本
-- 模型名稱: DT(決策樹), SVM(支持向量機), RF(隨機森林), CNN(神經網路)
+- 模型名稱: DT(決策樹), SVM(支持向量機), RF(隨機森林), ANN(人工神經網路), LR(邏輯回歸), NN(神經網路), SGD(隨機梯度下降)
 
 ### 載入和使用模型
 

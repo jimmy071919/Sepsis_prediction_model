@@ -5,7 +5,7 @@
 	- (獨變項)
 - 訓練集 : 測試集 => 2:1
 - 先用訓練集做出model，後用測試集進行測試
-- model要用多種方式進行=> DT，SVM，ANN，RF =>去用python的scikit套件就好
+- model要用多種方式進行=> DT，SVM，ANN，RF，LR，NN，SGD =>去用python的scikit套件就好
 - 要用10-fold cross varidation進行
 
 
@@ -37,7 +37,10 @@
 | DT  |     |           |        |     |
 | SVM |     |           |        |     |
 | RF  |     |           |        |     |
-| CNN |     |           |        |     |
+| ANN |     |           |        |     |
+| LR  |     |           |        |     |
+| NN  |     |           |        |     |
+| SGD |     |           |        |     |
 
 測試集:
 
@@ -46,7 +49,10 @@
 | DT  |     |           |        |     |
 | SVM |     |           |        |     |
 | RF  |     |           |        |     |
-| CNN |     |           |        |     |
+| ANN |     |           |        |     |
+| LR  |     |           |        |     |
+| NN  |     |           |        |     |
+| SGD |     |           |        |     |
 
 ## 描述性統計
 - a-x每一個都要有描述性統計

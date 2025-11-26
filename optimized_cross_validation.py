@@ -10,6 +10,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.impute import SimpleImputer
 from imblearn.over_sampling import SMOTE
@@ -67,13 +68,37 @@ class OptimizedCrossValidationTrainer:
                 max_depth=15,  # 稍微增加深度
                 class_weight='balanced'  # 處理類別不平衡
             ),
-            'CNN': MLPClassifier(
+            'ANN': MLPClassifier(
                 random_state=self.random_state, 
                 hidden_layer_sizes=(100, 50),  # 調整網路結構
                 max_iter=500,  # 增加迭代次數
                 early_stopping=True, 
                 validation_fraction=0.1,
                 alpha=0.001  # 正則化參數
+            ),
+            'LR': LogisticRegression(
+                random_state=self.random_state, 
+                max_iter=2000,  # 增加迭代次數
+                solver='liblinear',  # 適合小數據集
+                class_weight='balanced'  # 處理類別不平衡
+            ),
+            'NN': MLPClassifier(
+                random_state=self.random_state, 
+                hidden_layer_sizes=(200, 100, 50),  # 更深的網路
+                max_iter=800,  # 更多迭代
+                early_stopping=True, 
+                validation_fraction=0.1,
+                alpha=0.0001,  # 較小的正則化
+                learning_rate_init=0.001  # 學習率
+            ),
+            'SGD': SGDClassifier(
+                random_state=self.random_state, 
+                max_iter=2000,  # 增加迭代次數
+                loss='log_loss',  # 邏輯回歸損失
+                alpha=0.001,  # 正則化參數
+                class_weight='balanced',  # 處理類別不平衡
+                learning_rate='adaptive',  # 自適應學習率
+                eta0=0.01  # 初始學習率
             )
         }
         return models

@@ -203,7 +203,7 @@ def create_improvement_analysis():
 - **解決**: PCA降維至30維，保留主要變異量
 
 ### 2. 類別不平衡嚴重影響
-- **問題**: y特徵組合中SVM和CNN的F1=0.000
+- **問題**: y特徵組合中SVM和ANN的F1=0.000
 - **原因**: 敗血症:非敗血症 = 318:1568 (約1:5)
 - **解決**: SMOTE過採樣 + class_weight='balanced'
 
