@@ -20,7 +20,15 @@ def calculate_p_value(df, column):
         p_value: 統計檢驗的p值
         test_type: 使用的檢驗方法
     """
-    if df[column].dtype in [np.float64, np.int64]:
+    # 判斷是否為類別變數
+    # 1. 如果唯一值 <= 10，視為類別變數
+    # 2. 特定變數如SEX等已知的類別變數
+    categorical_vars = ['SEX']  # 明確指定的類別變數
+    unique_count = df[column].nunique()
+    
+    is_categorical = (column in categorical_vars) or (unique_count <= 10 and unique_count >= 2)
+    
+    if not is_categorical and df[column].dtype in [np.float64, np.int64]:
         # 連續變數使用t檢定
         group1 = df[df['isSepsis'] == "Y"][column].dropna()
         group2 = df[df['isSepsis'] == "N"][column].dropna()

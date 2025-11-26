@@ -97,10 +97,6 @@ def load_data(filename):
     total_original_missing = stats_df['原始缺失'].sum()
     total_cleaned = stats_df['異常剔除'].sum()
     total_final_missing = stats_df['缺失與異常總和'].sum()
-
-    print("=" * 50)
-    print("📊 數據質量處理報告")
-    print("=" * 50)
     
     # 設置pandas顯示選項，讓表格更美觀
     pd.set_option('display.width', 100)
