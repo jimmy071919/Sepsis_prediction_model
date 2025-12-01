@@ -18,7 +18,5 @@ T-Bil
 Lymph
 Segment
 PT
-Hs-CRP
-PCT
 Urine_Volumn
 GCS

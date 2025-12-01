@@ -7,6 +7,13 @@ def load_data(filename):
     df = pd.read_excel(filename, na_values=['', ' ', 'N/A', 'NA', 'na', 'n/a', None])
     print(f"已讀取 {filename}，資料總筆數: {len(df)}")
 
+    # 排除不需要的欄位 (PCT 和 Hs-CRP)
+    columns_to_exclude = ['PCT', 'Hs-CRP']
+    existing_excluded = [col for col in columns_to_exclude if col in df.columns]
+    if existing_excluded:
+        df = df.drop(columns=existing_excluded)
+        print(f"已排除欄位: {', '.join(existing_excluded)}")
+
     # 將所有應該是數值型的欄位轉換為數值型態
     # 排除明確的文字欄位
     text_columns = ['diagnosis', 'chief', 'isSepsis']
@@ -36,7 +43,6 @@ def load_data(filename):
         'Lymph': (0.1, 99),       # 淋巴球百分比
         'Segment': (0.1, 99),     # 嗜中性球百分比
         'PT': (5, 200),           # 凝血酶原時間
-        'PCT': (0.01, 500),       # 降鈣素原
         'BOXY': (0, 1000),        # 血氧飽和度
         'Pluse': (30, 250),       # 脈搏
         'LOS': (0, 10000)         # 住院天數
@@ -44,7 +50,7 @@ def load_data(filename):
 
     # 特殊處理：這些變數的 0 值視為異常 (因為有些生理數值不可能是0)
     zero_invalid_vars = ['Weight', 'WBC', 'PLT', 'Crea', 'T-Bil', 'Lymph', 
-                         'Segment', 'PT', 'PCT', 'BMI', 'SBP', 'DBP', 'MAP']
+                         'Segment', 'PT', 'BMI', 'SBP', 'DBP', 'MAP']
 
     # 為了確保比大小不出錯，先把所有要檢查的欄位都轉為數值 (無法轉的變 NaN)
     # 使用集合運算找出 df 中實際存在的欄位
